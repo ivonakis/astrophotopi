@@ -1,2 +1,1 @@
-# astrophotopi
-A simple raspberry pi camera with easy to use web interface and automation
+This project is aimed to make raspberry pi camera for astro photography. And to make controlling it easy through a web interface.
