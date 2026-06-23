@@ -55,6 +55,28 @@ app.get('/api/capture/preview', (_req, res) => {
     res.json({ binary: b64 });
 });
 
+app.get('/api/video/stream', (req, res) => {
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+
+    const fps = Number(req.query.fps ?? 5);
+    let idx = 0;
+
+    const images = fs.existsSync(IMAGES_DIR)
+        ? fs.readdirSync(IMAGES_DIR).filter(f => /\.(jpg|jpeg)$/i.test(f)).sort()
+        : [];
+
+    const interval = setInterval(() => {
+        if (images.length === 0) return;
+        const data = fs.readFileSync(path.join(IMAGES_DIR, images[idx % images.length]));
+        idx++;
+        res.write(`data: ${data.toString('base64')}\n\n`);
+    }, Math.round(1000 / fps));
+
+    req.on('close', () => clearInterval(interval));
+});
+
 app.get('/api/capture/capture', (_req, res) => {
     res.json({ ok: true });
 });

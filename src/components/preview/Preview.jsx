@@ -147,7 +147,7 @@ function Preview() {
     newCommand += resolutions[resolution];
     newCommand += cropOptions[crop];
     newCommand += " --immediate --awbgains 1,1";
-    newCommand += exposure > 0 ? " --shutter 100000000 --gain 1" : "";
+    newCommand += exposure > 0 ? ` --shutter ${exposure * 1000000} --gain 1` : "";
     newCommand += " --output -| base64";
     return newCommand;
   }
