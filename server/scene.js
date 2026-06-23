@@ -3,7 +3,7 @@ const router = express.Router()
 import fs from "fs";
 const SCENE_DIR = './data/scenes';
 
-router.get('/list', (req, res) => {
+router.get('/list', (_req, res) => {
     fs.mkdirSync(SCENE_DIR, { recursive: true });
     const files = fs.readdirSync(SCENE_DIR);
     res.json(files);

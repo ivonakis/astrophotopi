@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Checkbox } from "../ui/checkbox";
 import { Label } from "../ui/label";
 import { Input } from "../ui/input";
@@ -27,10 +27,8 @@ const cropOptions = {
   20: " --roi 0.4,0.4,0.2,0.2",
   10: " --roi 0.45,0.45,0.1,0.1",
 };
+
 function Preview() {
-  //   const [command, setCommand] = useState(
-  //     "rpicam-still -n --width 640 --height 480 --output -| base64"
-  //   );
   const [hasPreview, setHasPreview] = useState(false);
   const [response, setResponse] = useState("");
   const [resolution, setResolution] = useState("native");
@@ -39,7 +37,75 @@ function Preview() {
   const [isStreaming, setIsStreaming] = useState(false);
   const streamingRef = useRef(false);
 
+  const [presetName, setPresetName] = useState("");
+  const [presets, setPresets] = useState([]);
+  const [defaultPreset, setDefaultPreset] = useState(null);
+  const [selectedPreset, setSelectedPreset] = useState("");
+
   const command = buildCommand();
+
+  useEffect(() => {
+    fetch('/api/presets')
+      .then(r => r.json())
+      .then(data => {
+        setPresets(data.presets ?? []);
+        setDefaultPreset(data.default ?? null);
+        if (data.default) {
+          const preset = data.presets?.find(p => p.name === data.default);
+          if (preset) applyPreset(preset);
+        }
+      });
+  }, []);
+
+  function applyPreset(preset) {
+    setPresetName(preset.name);
+    setSelectedPreset(preset.name);
+    if (preset.focus) {
+      setHasPreview(preset.focus.hasPreview ?? false);
+      setResolution(preset.focus.resolution ?? "native");
+      setCrop(preset.focus.crop ?? "full");
+      setExposure(preset.focus.exposure ?? 0);
+    }
+  }
+
+  function savePreset() {
+    if (!presetName) return;
+    const preset = {
+      name: presetName,
+      focus: { hasPreview, resolution, crop, exposure: Number(exposure) },
+      exposure: {},
+      automation: {},
+    };
+    const updatedPresets = [...presets.filter(p => p.name !== presetName), preset];
+    persistPresets(updatedPresets, defaultPreset);
+    setPresets(updatedPresets);
+    setSelectedPreset(presetName);
+  }
+
+  function setAsDefault() {
+    if (!selectedPreset) return;
+    persistPresets(presets, selectedPreset);
+    setDefaultPreset(selectedPreset);
+  }
+
+  function deletePreset() {
+    if (!selectedPreset) return;
+    const updatedPresets = presets.filter(p => p.name !== selectedPreset);
+    const newDefault = defaultPreset === selectedPreset ? null : defaultPreset;
+    persistPresets(updatedPresets, newDefault);
+    setPresets(updatedPresets);
+    setDefaultPreset(newDefault);
+    setSelectedPreset("");
+    setPresetName("");
+  }
+
+  function persistPresets(updatedPresets, newDefault) {
+    fetch('/api/presets', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ default: newDefault, presets: updatedPresets }),
+    });
+  }
 
   function loop(cmd) {
     if (!streamingRef.current) return;
@@ -74,22 +140,6 @@ function Preview() {
     reader.onload = (e) => setResponse(e.target.result);
     reader.readAsDataURL(file);
   };
-  //   function handleCommandChange(event) {
-  //     // console.log(event.target.value);
-  //     setCommand(event.target.value);
-  //   }
-
-  function handleHasPreviewChange(checked) {
-    setHasPreview(checked);
-  }
-
-  function handleResolutionChange(value) {
-    setResolution(value);
-  }
-
-  function handleExposure(event) {
-    setExposure(event.target.value);
-  }
 
   function buildCommand() {
     let newCommand = "rpicam-still";
@@ -97,32 +147,54 @@ function Preview() {
     newCommand += resolutions[resolution];
     newCommand += cropOptions[crop];
     newCommand += " --immediate --awbgains 1,1";
-    newCommand +=
-      exposure > 0
-        ? " --shutter 100000000 --gain 1"
-        : "";
+    newCommand += exposure > 0 ? " --shutter 100000000 --gain 1" : "";
     newCommand += " --output -| base64";
     return newCommand;
   }
 
   return (
     <>
+      {presets.length > 0 && (
+        <div className="flex items-center gap-2">
+          <Select value={selectedPreset} onValueChange={name => { setSelectedPreset(name); const p = presets.find(p => p.name === name); if (p) applyPreset(p); }}>
+            <SelectTrigger className="flex-1">
+              <SelectValue placeholder="Select preset..." />
+            </SelectTrigger>
+            <SelectContent className="bg-white">
+              <SelectGroup>
+                {presets.map(p => (
+                  <SelectItem key={p.name} value={p.name}>
+                    {p.name}{defaultPreset === p.name ? " ★" : ""}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+          <Button variant="outline" className="self-start" disabled={!selectedPreset} onClick={setAsDefault}>Set Default</Button>
+          <Button variant="outline" className="self-start border-red-500 text-red-500 hover:bg-red-500 hover:text-white" disabled={!selectedPreset} onClick={deletePreset}>Delete</Button>
+        </div>
+      )}
+      <div className="flex items-center gap-2">
+        <Input
+          className="flex-1"
+          placeholder="Preset name..."
+          value={presetName}
+          onChange={e => setPresetName(e.target.value)}
+        />
+        <Button variant="outline" className="self-start" disabled={!presetName} onClick={savePreset}>Save</Button>
+      </div>
       <div className="flex items-center gap-3">
         <Checkbox
           id="hasPreview"
           checked={hasPreview}
-          onCheckedChange={handleHasPreviewChange}
+          onCheckedChange={setHasPreview}
         ></Checkbox>
         <Label htmlFor="hasPreview">
           Preview on screen(disabled by default)
         </Label>
       </div>
       <div className="flex items-center gap-3">
-        <Select
-          id="resolution"
-          onValueChange={handleResolutionChange}
-          defaultValue={resolution}
-        >
+        <Select value={resolution} onValueChange={setResolution}>
           <SelectTrigger className="w-[180px]">
             <SelectValue />
           </SelectTrigger>
@@ -135,10 +207,10 @@ function Preview() {
             </SelectGroup>
           </SelectContent>
         </Select>
-        <Label htmlFor="resolution">Resolution</Label>
+        <Label>Resolution</Label>
       </div>
       <div className="flex items-center gap-3">
-        <Select id="crop" onValueChange={setCrop} defaultValue={crop}>
+        <Select value={crop} onValueChange={setCrop}>
           <SelectTrigger className="w-[180px]">
             <SelectValue />
           </SelectTrigger>
@@ -151,7 +223,7 @@ function Preview() {
             </SelectGroup>
           </SelectContent>
         </Select>
-        <Label htmlFor="crop">Crop</Label>
+        <Label>Crop</Label>
       </div>
       <div className="flex items-center gap-3">
         <Input
@@ -160,20 +232,18 @@ function Preview() {
           min="0"
           max="200"
           placeholder="Exposure"
-          defaultValue={exposure}
-          onChange={handleExposure}
+          value={exposure}
+          onChange={e => setExposure(Number(e.target.value))}
         />
       </div>
-      {/* <FocusHelper></FocusHelper> */}
       {response && (
         <div>
           <Histogram dataUrl={response}></Histogram>
         </div>
       )}
       <span>{command}</span>
-      {/* <input type="text" value={command} onChange={handleCommandChange} /> */}
       {isStreaming
-        ? <Button variant="destructive" onClick={stopPreview} variant="outline" className="self-start">Stop</Button>
+        ? <Button variant="outline" onClick={stopPreview} className="self-start border-red-500 text-red-500 hover:bg-red-500 hover:text-white">Stop</Button>
         : <Button onClick={startPreview} variant="outline" className="self-start">Preview</Button>
       }
       or
@@ -181,5 +251,6 @@ function Preview() {
     </>
   );
 }
+
 
 export default Preview;

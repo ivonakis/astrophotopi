@@ -26,7 +26,20 @@ app.post('/api/scene/add', (req, res) => {
     res.json({ ok: true });
 });
 
-app.get('/api/capture/preview', (req, res) => {
+const PRESETS_FILE = path.join(__dirname, '../data/presets.json');
+
+app.get('/api/presets', (_req, res) => {
+    if (!fs.existsSync(PRESETS_FILE)) return res.json({ default: null, presets: [] });
+    res.json(JSON.parse(fs.readFileSync(PRESETS_FILE, 'utf8')));
+});
+
+app.post('/api/presets', (req, res) => {
+    fs.mkdirSync(path.dirname(PRESETS_FILE), { recursive: true });
+    fs.writeFileSync(PRESETS_FILE, JSON.stringify(req.body, null, 2));
+    res.json({ ok: true });
+});
+
+app.get('/api/capture/preview', (_req, res) => {
     // Cycle through images in mock-images/ if present
     if (fs.existsSync(IMAGES_DIR)) {
         const images = fs.readdirSync(IMAGES_DIR).filter(f => /\.(jpg|jpeg)$/i.test(f)).sort();
