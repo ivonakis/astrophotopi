@@ -8,21 +8,21 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 app.use(express.json());
 
-const PROJECTS_DIR = path.join(__dirname, '../data/mock-projects');
+const SCENES_DIR = path.join(__dirname, '../data/mock-scenes');
 const IMAGES_DIR = path.join(__dirname, '../mock-images');
 const GEN_SCRIPT = path.join(__dirname, 'gen-preview.py');
 
 let imageIndex = 0;
 
-app.get('/api/project/list', (req, res) => {
-    fs.mkdirSync(PROJECTS_DIR, { recursive: true });
-    res.json(fs.readdirSync(PROJECTS_DIR));
+app.get('/api/scene/list', (_req, res) => {
+    fs.mkdirSync(SCENES_DIR, { recursive: true });
+    res.json(fs.readdirSync(SCENES_DIR));
 });
 
-app.post('/api/project/add', (req, res) => {
+app.post('/api/scene/add', (req, res) => {
     const { name } = req.body;
     if (!name) return res.status(400).json({ error: 'name required' });
-    fs.mkdirSync(`${PROJECTS_DIR}/${name}/preview`, { recursive: true });
+    fs.mkdirSync(`${SCENES_DIR}/${name}/preview`, { recursive: true });
     res.json({ ok: true });
 });
 
