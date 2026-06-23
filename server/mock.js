@@ -28,14 +28,22 @@ app.post('/api/scene/add', (req, res) => {
 
 const PRESETS_FILE = path.join(__dirname, '../data/presets.json');
 
-app.get('/api/presets', (_req, res) => {
-    if (!fs.existsSync(PRESETS_FILE)) return res.json({ default: null, presets: [] });
-    res.json(JSON.parse(fs.readFileSync(PRESETS_FILE, 'utf8')));
+function readAllPresets() {
+    return fs.existsSync(PRESETS_FILE)
+        ? JSON.parse(fs.readFileSync(PRESETS_FILE, 'utf8'))
+        : {};
+}
+
+app.get('/api/presets/:section', (req, res) => {
+    const data = readAllPresets();
+    res.json(data[req.params.section] ?? { default: null, presets: [] });
 });
 
-app.post('/api/presets', (req, res) => {
+app.post('/api/presets/:section', (req, res) => {
     fs.mkdirSync(path.dirname(PRESETS_FILE), { recursive: true });
-    fs.writeFileSync(PRESETS_FILE, JSON.stringify(req.body, null, 2));
+    const data = readAllPresets();
+    data[req.params.section] = req.body;
+    fs.writeFileSync(PRESETS_FILE, JSON.stringify(data, null, 2));
     res.json({ ok: true });
 });
 

@@ -1,7 +1,7 @@
 import PropTypes from "prop-types";
 
 import Preview from "../preview/Preview";
-import FileTest from "../fileTest/FileTest";
+import Exposure from "../exposure/Exposure";
 import Video from "../video/Video";
 import BackButton from "../ui/backbutton";
 
@@ -31,7 +31,7 @@ function Scene({ scene, setScene }) {
           <Preview></Preview>
         </TabsContent>
         <TabsContent value="exposure" className="flex flex-col gap-4">
-          <FileTest></FileTest>
+          <Exposure></Exposure>
         </TabsContent>
         <TabsContent value="video" className="flex flex-col gap-4">
           <Video></Video>

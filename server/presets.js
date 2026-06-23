@@ -3,14 +3,22 @@ import fs from 'fs';
 const router = express.Router();
 const PRESETS_FILE = './data/presets.json';
 
-router.get('/', (_req, res) => {
-    if (!fs.existsSync(PRESETS_FILE)) return res.json({ default: null, presets: [] });
-    res.json(JSON.parse(fs.readFileSync(PRESETS_FILE, 'utf8')));
+function readAll() {
+    return fs.existsSync(PRESETS_FILE)
+        ? JSON.parse(fs.readFileSync(PRESETS_FILE, 'utf8'))
+        : {};
+}
+
+router.get('/:section', (req, res) => {
+    const data = readAll();
+    res.json(data[req.params.section] ?? { default: null, presets: [] });
 });
 
-router.post('/', (req, res) => {
+router.post('/:section', (req, res) => {
     fs.mkdirSync('./data', { recursive: true });
-    fs.writeFileSync(PRESETS_FILE, JSON.stringify(req.body, null, 2));
+    const data = readAll();
+    data[req.params.section] = req.body;
+    fs.writeFileSync(PRESETS_FILE, JSON.stringify(data, null, 2));
     res.json({ ok: true });
 });
 

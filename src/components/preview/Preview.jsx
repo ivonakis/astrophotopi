@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { Checkbox } from "../ui/checkbox";
 import { Label } from "../ui/label";
 import { Input } from "../ui/input";
@@ -41,11 +42,12 @@ function Preview() {
   const [presets, setPresets] = useState([]);
   const [defaultPreset, setDefaultPreset] = useState(null);
   const [selectedPreset, setSelectedPreset] = useState("");
+  const [showSettings, setShowSettings] = useState(false);
 
   const command = buildCommand();
 
   useEffect(() => {
-    fetch('/api/presets')
+    fetch('/api/presets/focus')
       .then(r => r.json())
       .then(data => {
         setPresets(data.presets ?? []);
@@ -60,22 +62,15 @@ function Preview() {
   function applyPreset(preset) {
     setPresetName(preset.name);
     setSelectedPreset(preset.name);
-    if (preset.focus) {
-      setHasPreview(preset.focus.hasPreview ?? false);
-      setResolution(preset.focus.resolution ?? "native");
-      setCrop(preset.focus.crop ?? "full");
-      setExposure(preset.focus.exposure ?? 0);
-    }
+    setHasPreview(preset.hasPreview ?? false);
+    setResolution(preset.resolution ?? "native");
+    setCrop(preset.crop ?? "full");
+    setExposure(preset.exposure ?? 0);
   }
 
   function savePreset() {
     if (!presetName) return;
-    const preset = {
-      name: presetName,
-      focus: { hasPreview, resolution, crop, exposure: Number(exposure) },
-      exposure: {},
-      automation: {},
-    };
+    const preset = { name: presetName, hasPreview, resolution, crop, exposure: Number(exposure) };
     const updatedPresets = [...presets.filter(p => p.name !== presetName), preset];
     persistPresets(updatedPresets, defaultPreset);
     setPresets(updatedPresets);
@@ -100,7 +95,7 @@ function Preview() {
   }
 
   function persistPresets(updatedPresets, newDefault) {
-    fetch('/api/presets', {
+    fetch('/api/presets/focus', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ default: newDefault, presets: updatedPresets }),
@@ -133,14 +128,6 @@ function Preview() {
     setIsStreaming(false);
   }
 
-  const handleImageUpload = (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (e) => setResponse(e.target.result);
-    reader.readAsDataURL(file);
-  };
-
   function buildCommand() {
     let newCommand = "rpicam-still";
     newCommand += hasPreview ? " " : " -n";
@@ -151,6 +138,8 @@ function Preview() {
     newCommand += " --output -| base64";
     return newCommand;
   }
+
+  const settingsVisible = presets.length === 0 || showSettings;
 
   return (
     <>
@@ -174,80 +163,79 @@ function Preview() {
           <Button variant="outline" className="self-start border-red-500 text-red-500 hover:bg-red-500 hover:text-white" disabled={!selectedPreset} onClick={deletePreset}>Delete</Button>
         </div>
       )}
-      <div className="flex items-center gap-2">
-        <Input
-          className="flex-1"
-          placeholder="Preset name..."
-          value={presetName}
-          onChange={e => setPresetName(e.target.value)}
-        />
-        <Button variant="outline" className="self-start" disabled={!presetName} onClick={savePreset}>Save</Button>
-      </div>
-      <div className="flex items-center gap-3">
-        <Checkbox
-          id="hasPreview"
-          checked={hasPreview}
-          onCheckedChange={setHasPreview}
-        ></Checkbox>
-        <Label htmlFor="hasPreview">
-          Preview on screen(disabled by default)
-        </Label>
-      </div>
-      <div className="flex items-center gap-3">
-        <Select value={resolution} onValueChange={setResolution}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent className="bg-white">
-            <SelectGroup>
-              <SelectItem value="native">Native</SelectItem>
-              <SelectItem value="480">640x480</SelectItem>
-              <SelectItem value="720">1280x720</SelectItem>
-              <SelectItem value="1080">1920x1080</SelectItem>
-            </SelectGroup>
-          </SelectContent>
-        </Select>
-        <Label>Resolution</Label>
-      </div>
-      <div className="flex items-center gap-3">
-        <Select value={crop} onValueChange={setCrop}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent className="bg-white">
-            <SelectGroup>
-              <SelectItem value="full">Full</SelectItem>
-              <SelectItem value="half">Half</SelectItem>
-              <SelectItem value="20">20 percent</SelectItem>
-              <SelectItem value="10">10 percent</SelectItem>
-            </SelectGroup>
-          </SelectContent>
-        </Select>
-        <Label>Crop</Label>
-      </div>
-      <div className="flex items-center gap-3">
-        <Input
-          className="flex-1"
-          type="number"
-          min="0"
-          max="200"
-          placeholder="Exposure"
-          value={exposure}
-          onChange={e => setExposure(Number(e.target.value))}
-        />
-      </div>
-      {response && (
-        <div>
-          <Histogram dataUrl={response}></Histogram>
-        </div>
+      {presets.length > 0 && (
+        <Button variant="ghost" className="self-start flex items-center gap-1 text-sm" onClick={() => setShowSettings(s => !s)}>
+          {showSettings ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+          Settings
+        </Button>
+      )}
+      {settingsVisible && (
+        <>
+          <div className="flex items-center gap-2">
+            <Input
+              className="flex-1"
+              placeholder="Preset name..."
+              value={presetName}
+              onChange={e => setPresetName(e.target.value)}
+            />
+            <Button variant="outline" className="self-start" disabled={!presetName} onClick={savePreset}>Save</Button>
+          </div>
+          <div className="flex items-center gap-3">
+            <Checkbox id="hasPreview" checked={hasPreview} onCheckedChange={setHasPreview}></Checkbox>
+            <Label htmlFor="hasPreview">Preview on screen(disabled by default)</Label>
+          </div>
+          <div className="flex items-center gap-3">
+            <Select value={resolution} onValueChange={setResolution}>
+              <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
+              <SelectContent className="bg-white">
+                <SelectGroup>
+                  <SelectItem value="native">Native</SelectItem>
+                  <SelectItem value="480">640x480</SelectItem>
+                  <SelectItem value="720">1280x720</SelectItem>
+                  <SelectItem value="1080">1920x1080</SelectItem>
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+            <Label>Resolution</Label>
+          </div>
+          <div className="flex items-center gap-3">
+            <Select value={crop} onValueChange={setCrop}>
+              <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
+              <SelectContent className="bg-white">
+                <SelectGroup>
+                  <SelectItem value="full">Full</SelectItem>
+                  <SelectItem value="half">Half</SelectItem>
+                  <SelectItem value="20">20 percent</SelectItem>
+                  <SelectItem value="10">10 percent</SelectItem>
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+            <Label>Crop</Label>
+          </div>
+          <div className="flex items-center gap-3">
+            <Input
+              className="flex-1"
+              type="number"
+              min="0"
+              max="200"
+              placeholder="Exposure (s)"
+              value={exposure}
+              onChange={e => setExposure(Number(e.target.value))}
+            />
+            <Label>Exposure (s)</Label>
+          </div>
+        </>
       )}
       <span>{command}</span>
       {isStreaming
         ? <Button variant="outline" onClick={stopPreview} className="self-start border-red-500 text-red-500 hover:bg-red-500 hover:text-white">Stop</Button>
         : <Button onClick={startPreview} variant="outline" className="self-start">Preview</Button>
       }
-      or
-      <input type="file" accept="image/jpeg" onChange={handleImageUpload} />
+      {response && (
+        <div>
+          <Histogram dataUrl={response}></Histogram>
+        </div>
+      )}
     </>
   );
 }
