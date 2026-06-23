@@ -8,8 +8,6 @@ function Histogram(props) {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
     const img = new Image();
-    img.src = imageUrl;
-
     img.onload = () => {
       // Draw image to canvas
       canvas.width = img.width;
@@ -34,7 +32,7 @@ function Histogram(props) {
         histB[data[i + 2]]++;
       }
 
-      const scale = Math.round(width / window.innerWidth);
+      const scale = Math.max(1, Math.round(width / window.innerWidth));
 
       // Normalize and draw histogram overlay
 
@@ -69,6 +67,7 @@ function Histogram(props) {
       ctx.fillStyle = "green";
       ctx.fillText("Sharpness: " + sharpness, 10, histHeight + 80 + 25* scale);
     };
+    img.src = imageUrl;
   };
 
   function varianceOfLaplacian(imageData) {
@@ -124,7 +123,7 @@ function Histogram(props) {
 
   useEffect(() => {
     drawImageAndHistogram();
-  });
+  }, [imageUrl]);
 
   return (
     <div className="flex flex-col items-center gap-4 p-4">

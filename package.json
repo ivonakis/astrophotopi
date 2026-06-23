@@ -5,10 +5,13 @@
   "type": "module",
   "scripts": {
     "astro": "node server.js",
+    "mock": "node server/mock.js",
     "dev": "vite",
+    "dev:mock": "node server/mock.js & vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "deploy": "bash deploy.sh"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

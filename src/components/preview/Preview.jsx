@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Checkbox } from "../ui/checkbox";
 import { Label } from "../ui/label";
 import { Input } from "../ui/input";
+import { Button } from "../ui/button";
 import Histogram from "../histogram/Histogram";
 
 import {
@@ -35,19 +36,35 @@ function Preview() {
   const [resolution, setResolution] = useState("native");
   const [crop, setCrop] = useState("full");
   const [exposure, setExposure] = useState(0);
+  const [isStreaming, setIsStreaming] = useState(false);
+  const streamingRef = useRef(false);
 
   const command = buildCommand();
 
-  function preview() {
-    fetch("/api/capture/preview?" + new URLSearchParams({ command }))
-      .then((response) => response.json())
+  function loop(cmd) {
+    if (!streamingRef.current) return;
+    fetch("/api/capture/preview?" + new URLSearchParams({ command: cmd }))
+      .then((res) => res.json())
       .then((data) => {
-        setResponse(data.binary);
+        setResponse("data:image/jpeg;base64," + data.binary);
+        loop(cmd);
       })
-      .then((data) => {
-        console.log(data.binary);
-      })
-      .catch((error) => console.log(error));
+      .catch((error) => {
+        console.log(error);
+        streamingRef.current = false;
+        setIsStreaming(false);
+      });
+  }
+
+  function startPreview() {
+    streamingRef.current = true;
+    setIsStreaming(true);
+    loop(command);
+  }
+
+  function stopPreview() {
+    streamingRef.current = false;
+    setIsStreaming(false);
   }
 
   const handleImageUpload = (event) => {
@@ -79,9 +96,10 @@ function Preview() {
     newCommand += hasPreview ? " " : " -n";
     newCommand += resolutions[resolution];
     newCommand += cropOptions[crop];
+    newCommand += " --immediate --awbgains 1,1";
     newCommand +=
       exposure > 0
-        ? " --shutter 100000000 --gain 1 --awbgains 1,1 --immediate"
+        ? " --shutter 100000000 --gain 1"
         : "";
     newCommand += " --output -| base64";
     return newCommand;
@@ -150,12 +168,14 @@ function Preview() {
       {response && (
         <div>
           <Histogram dataUrl={response}></Histogram>
-          {/* <img src={"data:image/jpeg;base64," + response} /> */}
         </div>
       )}
       <span>{command}</span>
       {/* <input type="text" value={command} onChange={handleCommandChange} /> */}
-      <button onClick={preview}>Preview</button>
+      {isStreaming
+        ? <Button variant="destructive" onClick={stopPreview} variant="outline" className="self-start">Stop</Button>
+        : <Button onClick={startPreview} variant="outline" className="self-start">Preview</Button>
+      }
       or
       <input type="file" accept="image/jpeg" onChange={handleImageUpload} />
     </>
