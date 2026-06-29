@@ -1,0 +1,14 @@
+[Unit]
+Description=WiFi: connect to home network or start access point
+After=NetworkManager.service network.target
+Wants=NetworkManager.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/wifi-ap-fallback.sh
+RemainAfterExit=yes
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

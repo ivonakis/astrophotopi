@@ -6,8 +6,8 @@ import { Button } from "../ui/button";
 import Histogram from "../histogram/Histogram";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 
-const TARGET_P95 = 85; // 1/3 of 255
-const MAX_EXPOSURE = 100;
+const TARGET_P95 = 85;
+const MAX_EXPOSURE_MS = 5000;
 
 const resolutionArgs = {
   native: "",
@@ -26,15 +26,12 @@ function computeP95(dataUrl) {
       const ctx = canvas.getContext('2d');
       ctx.drawImage(img, 0, 0);
       const { data } = ctx.getImageData(0, 0, img.width, img.height);
-
       const hist = new Array(256).fill(0);
       for (let i = 0; i < data.length; i += 4) {
         const y = Math.round(0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]);
         hist[y]++;
       }
-
-      const total = img.width * img.height;
-      const threshold = total * 0.95;
+      const threshold = img.width * img.height * 0.95;
       let cumulative = 0;
       for (let v = 0; v < 256; v++) {
         cumulative += hist[v];
@@ -46,8 +43,8 @@ function computeP95(dataUrl) {
   });
 }
 
-function Exposure() {
-  const [exposure, setExposure] = useState(30);
+function Flats() {
+  const [exposure, setExposure] = useState(100);
   const [gain, setGain] = useState(1);
   const [response, setResponse] = useState("");
   const [isCapturing, setIsCapturing] = useState(false);
@@ -63,7 +60,7 @@ function Exposure() {
   const [showSettings, setShowSettings] = useState(false);
 
   useEffect(() => {
-    fetch('/api/presets/exposure')
+    fetch('/api/presets/flats')
       .then(r => r.json())
       .then(data => {
         setPresets(data.presets ?? []);
@@ -78,7 +75,7 @@ function Exposure() {
   function applyPreset(preset) {
     setPresetName(preset.name);
     setSelectedPreset(preset.name);
-    setExposure(preset.exposure ?? 30);
+    setExposure(preset.exposure ?? 100);
     setGain(preset.gain ?? 1);
     setAutoExposeResolution(preset.autoExposeResolution ?? "480");
   }
@@ -110,7 +107,7 @@ function Exposure() {
   }
 
   function persistPresets(updatedPresets, newDefault) {
-    fetch('/api/presets/exposure', {
+    fetch('/api/presets/flats', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ default: newDefault, presets: updatedPresets }),
@@ -120,7 +117,7 @@ function Exposure() {
   function buildCommand(exp, g, res = "native") {
     let cmd = 'rpicam-still -n --awbgains 1,1';
     cmd += resolutionArgs[res] ?? "";
-    cmd += ` --shutter ${Math.round(Number(exp) * 1000000)}`;
+    cmd += ` --shutter ${Math.round(Number(exp) * 1000)}`; // ms → µs
     cmd += ` --gain ${Number(g)}`;
     cmd += ' --output -| base64';
     return cmd;
@@ -150,7 +147,7 @@ function Exposure() {
     for (let i = 0; i < 10; i++) {
       if (!autoRef.current) break;
 
-      setAutoStatus(`Shot ${i + 1}: ${currentExp}s`);
+      setAutoStatus(`Shot ${i + 1}: ${currentExp}ms`);
       setExposure(currentExp);
 
       let data;
@@ -168,19 +165,19 @@ function Exposure() {
       if (!autoRef.current) break;
 
       if (p95 === 0) {
-        currentExp = Math.min(currentExp * 2, MAX_EXPOSURE);
+        currentExp = Math.min(currentExp * 2, MAX_EXPOSURE_MS);
         continue;
       }
 
-      const next = Math.max(1, Math.min(MAX_EXPOSURE, Math.round(currentExp * TARGET_P95 / p95)));
-      setAutoStatus(`Shot ${i + 1}: ${currentExp}s → p95=${p95} → trying ${next}s`);
+      const next = Math.max(1, Math.min(MAX_EXPOSURE_MS, Math.round(currentExp * TARGET_P95 / p95)));
+      setAutoStatus(`Shot ${i + 1}: ${currentExp}ms → p95=${p95} → trying ${next}ms`);
 
       if (next === currentExp) break;
       currentExp = next;
     }
 
     setExposure(currentExp);
-    setAutoStatus(`Done — ${currentExp}s`);
+    setAutoStatus(`Done — ${currentExp}ms`);
     setIsAutoExposing(false);
     autoRef.current = false;
   }
@@ -231,12 +228,12 @@ function Exposure() {
               className="flex-1"
               type="number"
               min="1"
-              max={MAX_EXPOSURE}
-              placeholder="Exposure (s)"
+              max={MAX_EXPOSURE_MS}
+              placeholder="Exposure (ms)"
               value={exposure}
               onChange={e => setExposure(e.target.value)}
             />
-            <Label>Exposure (s)</Label>
+            <Label>Exposure (ms)</Label>
           </div>
           <div className="flex items-center gap-3">
             <Input
@@ -280,4 +277,4 @@ function Exposure() {
   );
 }
 
-export default Exposure;
+export default Flats;
